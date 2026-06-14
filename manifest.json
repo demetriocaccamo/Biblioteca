@@ -1,0 +1,17 @@
+{
+  "name": "La mia biblioteca",
+  "short_name": "Biblioteca",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#2b1d14",
+  "theme_color": "#2b1d14",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

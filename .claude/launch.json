@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "biblioteca",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3456", "--directory", "C:\\Users\\demet\\Desktop\\Biblioteca"],
+      "port": 3456
+    }
+  ]
+}

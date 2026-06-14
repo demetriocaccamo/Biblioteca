@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+  }
+</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" href="assets/icon-1024.png">
+<link rel="icon" href="assets/icon-1024.png">
+<meta name="theme-color" content="#2b1d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="La mia biblioteca">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  input, textarea, button { font-family: inherit; }
+  textarea { resize: none; }
+  ::placeholder { color: #b0a08c; }
+  @keyframes biblioUp { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes biblioToast { from { transform: translate(-50%, 16px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+  @keyframes biblioScan { 0% { top: 8%; } 50% { top: 88%; } 100% { top: 8%; } }
+  @keyframes biblioSpin { to { transform: rotate(360deg); } }
+  @keyframes biblioFade { from { opacity: 0; } to { opacity: 1; } }
+  .biblio-scroll::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</helmet>
+
+<div style="min-height:100dvh;background:#e7dcc6;display:flex;justify-content:center;font-family:'DM Sans',system-ui,sans-serif;color:#2c241c">
+<div style="width:100%;max-width:480px;background:#f3ead9;min-height:100dvh;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(60,40,20,0.18)">
+
+  <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#2b1d14;color:#f3ead9">
+      <img src="assets/icon-1024.png" alt="" style="width:84px;height:84px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,0.4)">
+      <div style="font-family:'Spectral',serif;font-size:21px;letter-spacing:0.2px">La mia biblioteca</div>
+      <div style="width:26px;height:26px;border:3px solid rgba(243,234,217,0.25);border-top-color:#cf9444;border-radius:50%;animation:biblioSpin 0.8s linear infinite"></div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isReady }}">
+  <div style="padding-bottom:78px;min-height:100dvh">
+
+    <!-- ============ CERCA ============ -->
+    <sc-if value="{{ isCerca }}">
+    <div style="padding:24px 20px 4px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="assets/icon-1024.png" alt="" style="width:46px;height:46px;border-radius:12px;box-shadow:0 4px 12px rgba(60,40,20,0.18)">
+        <div>
+          <div style="font-family:'Spectral',serif;font-size:23px;font-weight:600;line-height:1.05">La mia biblioteca</div>
+          <div style="font-size:13px;color:#8d7c66;margin-top:2px">{{ total }} volumi in casa</div>
+        </div>
+      </div>
+
+      <label style="margin-top:18px;display:flex;align-items:center;gap:11px;background:#fffdf8;border:1px solid #e2d5bd;border-radius:15px;padding:13px 15px;box-shadow:0 1px 3px rgba(60,40,20,0.05)">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#9c5a3c" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+        <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Cerca titolo, autore, editore…" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:16px;color:#2c241c">
+        <sc-if value="{{ hasQuery }}">
+          <button onClick="{{ clearQuery }}" style="border:none;background:#efe2cc;width:22px;height:22px;border-radius:50%;color:#7a6a54;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto">✕</button>
+        </sc-if>
+      </label>
+    </div>
+
+    <!-- shortcuts when empty -->
+    <sc-if value="{{ showShortcuts }}">
+    <div style="padding:18px 20px 8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <button onClick="{{ goScaffali }}" style="text-align:left;background:#fffdf8;border:1px solid #e9dcc4;border-radius:16px;padding:16px;cursor:pointer">
+          <div style="width:34px;height:34px;border-radius:9px;background:#f1e2cd;display:flex;align-items:center;justify-content:center;margin-bottom:10px">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#9c5a3c" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"></rect><rect x="14" y="3" width="7" height="18" rx="1"></rect></svg>
+          </div>
+          <div style="font-family:'Spectral',serif;font-size:16px;font-weight:600">Per scaffale</div>
+          <div style="font-size:12.5px;color:#8d7c66;margin-top:1px">Mappa fisica dei ripiani</div>
+        </button>
+        <button onClick="{{ goTemi }}" style="text-align:left;background:#fffdf8;border:1px solid #e9dcc4;border-radius:16px;padding:16px;cursor:pointer">
+          <div style="width:34px;height:34px;border-radius:9px;background:#e7ede0;display:flex;align-items:center;justify-content:center;margin-bottom:10px">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#5f7150" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          </div>
+          <div style="font-family:'Spectral',serif;font-size:16px;font-weight:600">Per categoria</div>
+          <div style="font-size:12.5px;color:#8d7c66;margin-top:1px">Narrativa, Storia, Mare…</div>
+        </button>
+      </div>
+
+      <sc-if value="{{ hasRecent }}">
+        <div style="margin-top:26px;display:flex;align-items:baseline;justify-content:space-between">
+          <div style="font-family:'Spectral',serif;font-size:17px;font-weight:600">Aggiunti di recente</div>
+        </div>
+        <div style="margin-top:6px">
+          <sc-for list="{{ recentAdded }}" as="item" hint-placeholder-count="2">
+            <button onClick="{{ item.onOpen }}" style="display:flex;gap:13px;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #ece0ca;padding:12px 0;cursor:pointer;align-items:center">
+              <div style="position:relative;width:42px;height:58px;flex:0 0 auto;border-radius:5px;overflow:hidden;background:{{ item.spine }};box-shadow:0 1px 3px rgba(0,0,0,0.22)">
+                <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Spectral',serif;font-weight:600;font-size:15px">{{ item.initial }}</span>
+                {{ item.coverEl }}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:'Spectral',serif;font-size:15.5px;line-height:1.2;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.title }}</div>
+                <div style="font-size:13px;color:#8d7c66;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.author }}</div>
+              </div>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <div style="margin-top:30px;padding:22px 18px;border:1px dashed #d8c8ac;border-radius:16px;text-align:center">
+        <div style="font-family:'Spectral',serif;font-style:italic;font-size:16px;color:#6f6353;line-height:1.4">«Una casa senza libri<br>è come un corpo senz'anima.»</div>
+        <div style="font-size:12px;color:#a2917a;margin-top:8px">— Cicerone</div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- results -->
+    <sc-if value="{{ hasQuery }}">
+    <div style="padding:14px 20px 8px">
+      <sc-if value="{{ hasResults }}">
+        <div style="font-size:12.5px;color:#8d7c66;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;margin-bottom:2px">{{ resultCount }} risultati</div>
+        <sc-for list="{{ results }}" as="item" hint-placeholder-count="6">
+          <button onClick="{{ item.onOpen }}" style="display:flex;gap:14px;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #ece0ca;padding:13px 0;cursor:pointer;align-items:center">
+            <div style="position:relative;width:46px;height:64px;flex:0 0 auto;border-radius:5px;overflow:hidden;background:{{ item.spine }};box-shadow:0 1px 3px rgba(0,0,0,0.22)">
+              <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Spectral',serif;font-weight:600;font-size:17px">{{ item.initial }}</span>
+              {{ item.coverEl }}
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:'Spectral',serif;font-size:16px;line-height:1.22;font-weight:600;color:#2c241c">{{ item.title }}</div>
+              <div style="font-size:13px;color:#8d7c66;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.author }}</div>
+              <div style="display:inline-block;margin-top:5px;font-size:11px;color:#9c5a3c;background:#f4e8d6;border-radius:20px;padding:2px 9px;font-weight:600">{{ item.chip }}</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c3b196" stroke-width="2.4" stroke-linecap="round" style="flex:0 0 auto"><polyline points="9 6 15 12 9 18"></polyline></svg>
+          </button>
+        </sc-for>
+        <sc-if value="{{ hasMore }}">
+          <div style="text-align:center;padding:16px;color:#a2917a;font-size:13px">…e altri {{ resultMore }} risultati. Affina la ricerca.</div>
+        </sc-if>
+      </sc-if>
+      <sc-if value="{{ noResults }}">
+        <div style="text-align:center;padding:48px 20px;color:#a2917a">
+          <div style="font-size:34px;margin-bottom:10px">🔍</div>
+          <div style="font-family:'Spectral',serif;font-size:18px;color:#6f6353">Nessun libro trovato</div>
+          <div style="font-size:13.5px;margin-top:6px;line-height:1.5">Non c'è nulla per «{{ query }}».<br>Vuoi aggiungerlo alla biblioteca?</div>
+          <button onClick="{{ goAddFromSearch }}" style="margin-top:16px;background:#9c4f30;color:#fff;border:none;border-radius:11px;padding:11px 20px;font-size:14px;font-weight:600;cursor:pointer">+ Aggiungi un libro</button>
+        </div>
+      </sc-if>
+    </div>
+    </sc-if>
+    </sc-if>
+
+    <!-- ============ SFOGLIA ============ -->
+    <sc-if value="{{ isSfoglia }}">
+    <div style="padding:24px 20px 4px">
+      <div style="font-family:'Spectral',serif;font-size:25px;font-weight:600">Sfoglia</div>
+      <div style="display:flex;gap:5px;margin-top:16px;background:#e9dcc4;border-radius:12px;padding:4px">
+        <button onClick="{{ setScaffali }}" style="flex:1;border:none;border-radius:9px;padding:9px 4px;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ scaffaliTabBg }};color:{{ scaffaliTabColor }}">Scaffali</button>
+        <button onClick="{{ setCategorie }}" style="flex:1;border:none;border-radius:9px;padding:9px 4px;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ categorieTabBg }};color:{{ categorieTabColor }}">Categorie</button>
+        <button onClick="{{ setAutori }}" style="flex:1;border:none;border-radius:9px;padding:9px 4px;font-size:13.5px;font-weight:600;cursor:pointer;background:{{ autoriTabBg }};color:{{ autoriTabColor }}">Autori A–Z</button>
+      </div>
+    </div>
+
+    <!-- Scaffali -->
+    <sc-if value="{{ isScaffaliMode }}">
+    <div style="padding:8px 20px 8px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin:14px 0 10px">
+        <span style="font-size:12.5px;color:#8d7c66;text-transform:uppercase;letter-spacing:0.06em;font-weight:600">Scaffale destro</span>
+        <span style="font-size:11.5px;color:#9c5a3c;background:#f4e8d6;border-radius:20px;padding:2px 10px;font-weight:600">Narrativa</span>
+      </div>
+      <div style="display:flex;gap:7px;align-items:flex-start">
+        <sc-for list="{{ columnsDX }}" as="col" hint-placeholder-count="4">
+          <div style="flex:1;min-width:0">
+            <div style="text-align:center;font-family:'Spectral',serif;font-weight:700;font-size:15px;color:#9c5a3c;margin-bottom:6px">{{ col.letter }}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ col.cells }}" as="cell" hint-placeholder-count="7">
+                <button onClick="{{ cell.onOpen }}" style="background:#2f241a;border:none;border-radius:6px;padding:8px 3px;cursor:pointer;color:#f3ead9;display:flex;flex-direction:column;align-items:center;gap:1px;box-shadow:inset 0 -3px 6px rgba(0,0,0,0.3);opacity:{{ cell.cellOpacity }}">
+                  <span style="font-size:12px;font-weight:700;letter-spacing:0.02em">{{ cell.label }}</span>
+                  <span style="font-size:11px;color:#e3b878;font-weight:600">{{ cell.count }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="font-size:12.5px;color:#8d7c66;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;margin:26px 0 10px">Scaffale sinistro · per categoria</div>
+      <div style="display:flex;gap:7px;align-items:flex-start">
+        <sc-for list="{{ columnsSX }}" as="col" hint-placeholder-count="3">
+          <div style="flex:1;min-width:0">
+            <div style="text-align:center;font-family:'Spectral',serif;font-weight:700;font-size:15px;color:#9c5a3c;margin-bottom:6px">{{ col.letter }}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ col.cells }}" as="cell" hint-placeholder-count="7">
+                <button onClick="{{ cell.onOpen }}" style="background:#2f241a;border:none;border-radius:6px;padding:7px 3px;cursor:pointer;color:#f3ead9;display:flex;flex-direction:column;align-items:center;gap:1px;box-shadow:inset 0 -3px 6px rgba(0,0,0,0.3);opacity:{{ cell.cellOpacity }}">
+                  <span style="font-size:12px;font-weight:700;letter-spacing:0.02em">{{ cell.label }}</span>
+                  <span style="font-size:9px;color:#c9a878;line-height:1.1;text-align:center">{{ cell.cat }}</span>
+                  <span style="font-size:11px;color:#e3b878;font-weight:600">{{ cell.count }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ hasLaura }}">
+        <div style="font-size:12.5px;color:#8d7c66;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;margin:26px 0 10px">Altre sezioni</div>
+        <button onClick="{{ openLaura }}" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:#fffdf8;border:1px solid #e9dcc4;border-radius:13px;padding:14px 16px;cursor:pointer;text-align:left">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="width:10px;height:34px;border-radius:3px;background:#cf9444"></span>
+            <span style="font-family:'Spectral',serif;font-size:16.5px;font-weight:600">Laura · per ragazzi</span>
+          </div>
+          <span style="font-size:13px;color:#9c5a3c;background:#f4e8d6;border-radius:20px;padding:3px 10px;font-weight:600">{{ lauraCount }}</span>
+        </button>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- Categorie -->
+    <sc-if value="{{ isCategorieMode }}">
+    <div style="padding:14px 20px 8px">
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <sc-for list="{{ catGroups }}" as="c" hint-placeholder-count="6">
+          <button onClick="{{ c.onOpen }}" style="display:flex;align-items:center;justify-content:space-between;background:#fffdf8;border:1px solid #e9dcc4;border-radius:13px;padding:14px 16px;cursor:pointer;text-align:left">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:10px;height:34px;border-radius:3px;background:{{ c.color }}"></span>
+              <span style="font-family:'Spectral',serif;font-size:16.5px;font-weight:600">{{ c.label }}</span>
+            </div>
+            <span style="font-size:13px;color:#9c5a3c;background:#f4e8d6;border-radius:20px;padding:3px 10px;font-weight:600">{{ c.count }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- Autori -->
+    <sc-if value="{{ isAutoriMode }}">
+    <div style="padding:8px 20px 8px">
+      <sc-for list="{{ authorGroups }}" as="g" hint-placeholder-count="6">
+        <div style="margin-top:14px">
+          <div style="font-family:'Spectral',serif;font-size:18px;font-weight:700;color:#9c5a3c;border-bottom:2px solid #e9dcc4;padding-bottom:4px">{{ g.letter }}</div>
+          <sc-for list="{{ g.books }}" as="item" hint-placeholder-count="4">
+            <button onClick="{{ item.onOpen }}" style="display:flex;gap:12px;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #ece0ca;padding:11px 0;cursor:pointer;align-items:center">
+              <div style="width:34px;height:46px;flex:0 0 auto;border-radius:4px;background:{{ item.spine }};display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Spectral',serif;font-weight:600;font-size:14px;box-shadow:0 1px 2px rgba(0,0,0,0.2)">{{ item.initial }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:600;color:#3a3026;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.author }}</div>
+                <div style="font-family:'Spectral',serif;font-size:14.5px;color:#6f6353;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.title }}</div>
+              </div>
+              <span style="font-size:10.5px;color:#9c5a3c;background:#f4e8d6;border-radius:20px;padding:2px 8px;font-weight:600;flex:0 0 auto">{{ item.shortLoc }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+    </sc-if>
+
+    <!-- ============ AGGIUNGI ============ -->
+    <sc-if value="{{ isAggiungi }}">
+    <div style="padding:24px 20px 4px">
+      <div style="font-family:'Spectral',serif;font-size:25px;font-weight:600">Aggiungi un libro</div>
+
+      <!-- choose -->
+      <sc-if value="{{ isChoose }}">
+      <div style="margin-top:8px;font-size:14px;color:#8d7c66;line-height:1.5">Come vuoi catalogarlo?</div>
+      <div style="display:flex;flex-direction:column;gap:13px;margin-top:18px">
+        <button onClick="{{ startScan }}" style="display:flex;align-items:center;gap:15px;background:#9c4f30;border:none;border-radius:16px;padding:18px;cursor:pointer;text-align:left;color:#fff">
+          <div style="width:44px;height:44px;border-radius:11px;background:rgba(255,255,255,0.16);display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><line x1="7" y1="12" x2="17" y2="12"></line></svg>
+          </div>
+          <div><div style="font-family:'Spectral',serif;font-size:17px;font-weight:600">Scansiona il codice a barre</div><div style="font-size:13px;opacity:0.82;margin-top:1px">Inquadra l'ISBN con la fotocamera</div></div>
+        </button>
+        <button onClick="{{ startIsbn }}" style="display:flex;align-items:center;gap:15px;background:#fffdf8;border:1px solid #e9dcc4;border-radius:16px;padding:18px;cursor:pointer;text-align:left;color:#2c241c">
+          <div style="width:44px;height:44px;border-radius:11px;background:#f1e2cd;display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9c5a3c" stroke-width="2" stroke-linecap="round"><path d="M4 6v12M8 6v12M12 6v12M16 6v12M20 6v12"></path></svg>
+          </div>
+          <div><div style="font-family:'Spectral',serif;font-size:17px;font-weight:600">Inserisci l'ISBN</div><div style="font-size:13px;color:#8d7c66;margin-top:1px">Recupero titolo, autore e copertina</div></div>
+        </button>
+        <button onClick="{{ startManual }}" style="display:flex;align-items:center;gap:15px;background:#fffdf8;border:1px solid #e9dcc4;border-radius:16px;padding:18px;cursor:pointer;text-align:left;color:#2c241c">
+          <div style="width:44px;height:44px;border-radius:11px;background:#e7ede0;display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5f7150" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"></path></svg>
+          </div>
+          <div><div style="font-family:'Spectral',serif;font-size:17px;font-weight:600">Inserisci manualmente</div><div style="font-size:13px;color:#8d7c66;margin-top:1px">Compila tu autore, titolo, ecc.</div></div>
+        </button>
+      </div>
+      </sc-if>
+
+      <!-- scan -->
+      <sc-if value="{{ isScan }}">
+      <div style="margin-top:18px">
+        <div style="position:relative;width:100%;aspect-ratio:3/4;max-height:46vh;background:#1d150e;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+          <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, rgba(120,90,55,0.35), #140d08 80%)"></div>
+          <div style="position:relative;width:78%;height:46%;border:2px solid rgba(243,234,217,0.55);border-radius:10px">
+            <div style="position:absolute;left:0;right:0;height:2px;background:#cf9444;box-shadow:0 0 10px 2px rgba(207,148,68,0.6);animation:biblioScan 2.4s ease-in-out infinite"></div>
+            <div style="position:absolute;top:-2px;left:-2px;width:22px;height:22px;border-top:3px solid #cf9444;border-left:3px solid #cf9444;border-radius:6px 0 0 0"></div>
+            <div style="position:absolute;top:-2px;right:-2px;width:22px;height:22px;border-top:3px solid #cf9444;border-right:3px solid #cf9444;border-radius:0 6px 0 0"></div>
+            <div style="position:absolute;bottom:-2px;left:-2px;width:22px;height:22px;border-bottom:3px solid #cf9444;border-left:3px solid #cf9444;border-radius:0 0 0 6px"></div>
+            <div style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-bottom:3px solid #cf9444;border-right:3px solid #cf9444;border-radius:0 0 6px 0"></div>
+          </div>
+          <div style="position:absolute;bottom:14px;left:0;right:0;text-align:center;color:rgba(243,234,217,0.85);font-size:13px">Inquadra il codice a barre sul retro del libro</div>
+        </div>
+        <div style="margin-top:14px;font-size:12.5px;color:#a2917a;text-align:center;line-height:1.5">Nell'app installata sul telefono qui si apre la fotocamera.<br>Per la demo, simula una scansione:</div>
+        <button onClick="{{ simulateScan }}" style="margin-top:14px;width:100%;background:#9c4f30;color:#fff;border:none;border-radius:13px;padding:14px;font-size:15px;font-weight:600;cursor:pointer">Simula scansione</button>
+        <button onClick="{{ backToChoose }}" style="margin-top:10px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Annulla</button>
+      </div>
+      </sc-if>
+
+      <!-- isbn input -->
+      <sc-if value="{{ isIsbn }}">
+      <div style="margin-top:18px">
+        <label style="font-size:13px;font-weight:600;color:#6f6353">Codice ISBN</label>
+        <input value="{{ isbnInput }}" onInput="{{ onIsbnInput }}" inputmode="numeric" placeholder="es. 9788807886218" style="margin-top:7px;width:100%;border:1px solid #e2d5bd;border-radius:13px;padding:14px;font-size:16px;background:#fffdf8;color:#2c241c;outline:none">
+        <sc-if value="{{ lookupErrored }}">
+          <div style="margin-top:8px;font-size:13px;color:#b04a35">ISBN non valido. Deve avere 10 o 13 cifre.</div>
+        </sc-if>
+        <button onClick="{{ doLookup }}" style="margin-top:14px;width:100%;background:{{ lookupBtnBg }};color:#fff;border:none;border-radius:13px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px">
+          <sc-if value="{{ lookupLoading }}"><span style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:biblioSpin 0.7s linear infinite"></span></sc-if>
+          {{ lookupBtnLabel }}
+        </button>
+        <button onClick="{{ backToChoose }}" style="margin-top:10px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Indietro</button>
+      </div>
+      </sc-if>
+
+      <!-- review / manual form -->
+      <sc-if value="{{ isReview }}">
+      <div style="margin-top:16px">
+        <sc-if value="{{ lookupFound }}">
+          <div style="display:flex;gap:13px;align-items:center;background:#e7ede0;border-radius:13px;padding:12px 14px;margin-bottom:16px">
+            <div style="position:relative;width:42px;height:58px;flex:0 0 auto;border-radius:5px;overflow:hidden;background:#5f7150;box-shadow:0 1px 3px rgba(0,0,0,0.2)">
+              {{ draftCoverEl }}
+            </div>
+            <div style="font-size:13.5px;color:#46553c;line-height:1.4">Dati trovati online ✓<br><span style="color:#6f7a60">Controlla e scegli dove riporlo.</span></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ lookupMissed }}">
+          <div style="background:#f6ece0;border-radius:13px;padding:12px 14px;margin-bottom:16px;font-size:13.5px;color:#9c5a3c;line-height:1.4">Nessun dato trovato per questo ISBN. Compila i campi a mano.</div>
+        </sc-if>
+
+        <div style="display:flex;flex-direction:column;gap:13px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.04em">Titolo</label>
+            <input value="{{ d_title }}" onInput="{{ dh.title }}" placeholder="Titolo del libro" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:11px;padding:12px;font-size:15.5px;background:#fffdf8;color:#2c241c;outline:none;font-family:'Spectral',serif">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.04em">Autore</label>
+            <input value="{{ d_author }}" onInput="{{ dh.author }}" placeholder="Cognome, Nome" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:11px;padding:12px;font-size:15px;background:#fffdf8;color:#2c241c;outline:none">
+          </div>
+          <div style="display:flex;gap:11px">
+            <div style="flex:2">
+              <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.04em">Editore</label>
+              <input value="{{ d_publisher }}" onInput="{{ dh.publisher }}" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:11px;padding:12px;font-size:15px;background:#fffdf8;color:#2c241c;outline:none">
+            </div>
+            <div style="flex:1">
+              <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.04em">Anno</label>
+              <input value="{{ d_year }}" onInput="{{ dh.year }}" inputmode="numeric" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:11px;padding:12px;font-size:15px;background:#fffdf8;color:#2c241c;outline:none">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.04em">ISBN</label>
+            <input value="{{ d_isbn }}" onInput="{{ dh.isbn }}" inputmode="numeric" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:11px;padding:12px;font-size:15px;background:#fffdf8;color:#2c241c;outline:none">
+          </div>
+
+          <div style="margin-top:6px;padding-top:14px;border-top:1px dashed #ddd0b6">
+            <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.04em">Dove lo riponi?</label>
+            <div style="display:flex;gap:8px;margin-top:9px">
+              <sc-for list="{{ sidePills }}" as="p" hint-placeholder-count="3">
+                <button onClick="{{ p.onPick }}" style="flex:1;border:1px solid {{ p.border }};background:{{ p.bg }};color:{{ p.color }};border-radius:11px;padding:10px 6px;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.2">{{ p.label }}</button>
+              </sc-for>
+            </div>
+            <input value="{{ d_sector }}" onInput="{{ dh.sector }}" placeholder="{{ sectorPlaceholder }}" style="margin-top:11px;width:100%;border:1px solid #e2d5bd;border-radius:11px;padding:12px;font-size:15px;background:#fffdf8;color:#2c241c;outline:none">
+            <sc-if value="{{ hasSectorChips }}">
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px">
+                <sc-for list="{{ sectorChips }}" as="c" hint-placeholder-count="6">
+                  <button onClick="{{ c.onPick }}" style="border:1px solid {{ c.border }};background:{{ c.bg }};color:{{ c.color }};border-radius:20px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <div style="font-size:12px;color:#a2917a;margin-top:9px;line-height:1.45">{{ sectorHint }}</div>
+          </div>
+        </div>
+
+        <button onClick="{{ saveBook }}" style="margin-top:20px;width:100%;background:{{ saveBg }};color:#fff;border:none;border-radius:13px;padding:15px;font-size:15.5px;font-weight:700;cursor:pointer">Salva nella biblioteca</button>
+        <button onClick="{{ backToChoose }}" style="margin-top:10px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Annulla</button>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ============ BOTTOM NAV ============ -->
+    <nav style="position:absolute;bottom:0;left:0;right:0;height:66px;background:#fdf8ee;border-top:1px solid #e6d9c1;display:flex;align-items:stretch;padding-bottom:env(safe-area-inset-bottom)">
+      <button onClick="{{ navCerca }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ cercaColor }}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+        <span style="font-size:11px;font-weight:600">Cerca</span>
+      </button>
+      <button onClick="{{ navSfoglia }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ sfogliaColor }}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"></rect><rect x="14" y="3" width="7" height="18" rx="1"></rect></svg>
+        <span style="font-size:11px;font-weight:600">Sfoglia</span>
+      </button>
+      <button onClick="{{ navAggiungi }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ aggiungiColor }}">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        <span style="font-size:11px;font-weight:600">Aggiungi</span>
+      </button>
+    </nav>
+  </div>
+  </sc-if>
+
+  <!-- ============ SECTOR LIST OVERLAY ============ -->
+  <sc-if value="{{ isSectorOpen }}">
+  <div style="position:absolute;inset:0;background:#f3ead9;z-index:40;display:flex;flex-direction:column;animation:biblioUp 0.24s ease">
+    <header style="padding:16px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e6d9c1;background:#fdf8ee">
+      <button onClick="{{ closeSector }}" style="background:#f1e2cd;border:none;width:36px;height:36px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9c5a3c" stroke-width="2.4" stroke-linecap="round"><polyline points="15 6 9 12 15 18"></polyline></svg>
+      </button>
+      <div style="min-width:0">
+        <div style="font-family:'Spectral',serif;font-size:19px;font-weight:600;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ sectorTitle }}</div>
+        <div style="font-size:12.5px;color:#8d7c66">{{ sectorSubtitle }}</div>
+      </div>
+    </header>
+    <div class="biblio-scroll" style="flex:1;overflow-y:auto;padding:8px 18px 24px">
+      <sc-for list="{{ sectorBooks }}" as="item" hint-placeholder-count="8">
+        <button onClick="{{ item.onOpen }}" style="display:flex;gap:13px;width:100%;text-align:left;background:transparent;border:none;border-bottom:1px solid #ece0ca;padding:12px 0;cursor:pointer;align-items:center">
+          <div style="width:38px;height:52px;flex:0 0 auto;border-radius:4px;background:{{ item.spine }};display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Spectral',serif;font-weight:600;font-size:15px;box-shadow:0 1px 3px rgba(0,0,0,0.2)">{{ item.initial }}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:'Spectral',serif;font-size:15.5px;font-weight:600;line-height:1.2;color:#2c241c">{{ item.title }}</div>
+            <div style="font-size:13px;color:#8d7c66;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ item.author }}</div>
+          </div>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ DETAIL OVERLAY ============ -->
+  <sc-if value="{{ isDetailOpen }}">
+  <div style="position:absolute;inset:0;background:#f3ead9;z-index:60;display:flex;flex-direction:column;animation:biblioUp 0.24s ease">
+    <header style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;background:#fdf8ee;border-bottom:1px solid #e6d9c1">
+      <button onClick="{{ closeBook }}" style="background:#f1e2cd;border:none;width:36px;height:36px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9c5a3c" stroke-width="2.4" stroke-linecap="round"><polyline points="15 6 9 12 15 18"></polyline></svg>
+      </button>
+      <sc-if value="{{ detailDeletable }}">
+        <button onClick="{{ deleteBook }}" style="background:none;border:none;color:#b04a35;font-size:13.5px;font-weight:600;cursor:pointer;padding:8px 4px">Elimina</button>
+      </sc-if>
+    </header>
+    <div class="biblio-scroll" style="flex:1;overflow-y:auto;padding:26px 22px 40px">
+      <div style="width:152px;height:218px;margin:0 auto;position:relative;border-radius:9px;overflow:hidden;background:{{ detailSpine }};box-shadow:0 16px 36px rgba(50,30,15,0.3)">
+        <div style="position:absolute;inset:0;padding:16px;display:flex;flex-direction:column;justify-content:space-between;color:#fff8ee">
+          <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.7">{{ detailPublisher }}</div>
+          <div>
+            <div style="font-family:'Spectral',serif;font-size:17px;font-weight:600;line-height:1.18">{{ detailTitle }}</div>
+            <div style="font-size:12px;opacity:0.82;margin-top:6px">{{ detailAuthor }}</div>
+          </div>
+        </div>
+        {{ detailCoverEl }}
+      </div>
+
+      <div style="text-align:center;margin-top:22px">
+        <div style="font-family:'Spectral',serif;font-size:24px;font-weight:600;line-height:1.18;text-wrap:pretty">{{ detailTitle }}</div>
+        <div style="font-size:15px;color:#8d7c66;margin-top:6px">{{ detailAuthor }}</div>
+      </div>
+
+      <div style="margin-top:22px;background:#fffdf8;border:1px solid #e9dcc4;border-radius:15px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f0e5d1"><span style="color:#8d7c66;font-size:13.5px">Editore</span><span style="font-size:14px;font-weight:600;text-align:right">{{ detailPublisherOr }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f0e5d1"><span style="color:#8d7c66;font-size:13.5px">Anno</span><span style="font-size:14px;font-weight:600">{{ detailYearOr }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f0e5d1"><span style="color:#8d7c66;font-size:13.5px">ISBN</span><span style="font-size:14px;font-weight:600">{{ detailIsbnOr }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:13px 16px"><span style="color:#8d7c66;font-size:13.5px">Categoria</span><span style="font-size:14px;font-weight:600;color:#9c5a3c">{{ detailCategory }}</span></div>
+      </div>
+
+      <div style="margin-top:14px;background:#2f241a;border-radius:15px;padding:16px;color:#f3ead9;display:flex;align-items:center;gap:14px">
+        <div style="width:42px;height:42px;border-radius:11px;background:rgba(207,148,68,0.22);display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e3b878" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        </div>
+        <div>
+          <div style="font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#c9a878">Dove si trova</div>
+          <div style="font-family:'Spectral',serif;font-size:16.5px;font-weight:600;margin-top:2px">{{ detailSideLabel }}</div>
+          <div style="font-size:13px;color:#d8c6a8;margin-top:1px">{{ detailLocation }}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <label style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.05em">Le mie note</label>
+        <textarea value="{{ detailNotes }}" onInput="{{ onNote }}" rows="4" placeholder="Pensieri, a chi l'hai prestato, dove l'hai comprato…" style="margin-top:7px;width:100%;border:1px solid #e2d5bd;border-radius:13px;padding:13px;font-size:15px;background:#fffdf8;color:#2c241c;outline:none;line-height:1.5;font-family:'Spectral',serif"></textarea>
+        <div style="font-size:11.5px;color:#a2917a;margin-top:4px">Le note vengono salvate automaticamente.</div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- toast -->
+  <sc-if value="{{ hasToast }}">
+    <div style="position:absolute;bottom:84px;left:50%;transform:translateX(-50%);background:#2f241a;color:#f3ead9;padding:12px 18px;border-radius:13px;font-size:13.5px;font-weight:500;z-index:80;box-shadow:0 8px 24px rgba(0,0,0,0.3);animation:biblioToast 0.3s ease;max-width:88%;text-align:center">{{ toastMsg }}</div>
+  </sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    loaded: false, books: [], tab: 'cerca', query: '',
+    detailId: null, browseMode: 'scaffali', sector: null,
+    addStep: 'choose', isbnInput: '', lookupState: 'idle', draft: null, toast: null
+  };
+
+  KEY = 'biblioteca_v1';
+  imgErr = (e) => { try { e.currentTarget.style.opacity = '0'; } catch (x) {} };
+
+  componentDidMount() {
+    fetch('./data/books.json')
+      .then(r => r.json())
+      .then(base => {
+        const store = this.load();
+        const added = store.added || [];
+        const overrides = store.overrides || {};
+        const books = base.concat(added);
+        books.forEach(b => { if (overrides[b.id] != null) b.notes = overrides[b.id]; });
+        this.setState({ books, loaded: true });
+      })
+      .catch(() => this.setState({ loaded: true, books: [] }));
+  }
+
+  load() { try { return JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch (e) { return {}; } }
+  save(s) { try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch (e) {} }
+  persistOverride(id, notes) { const s = this.load(); s.overrides = s.overrides || {}; s.overrides[id] = notes; this.save(s); }
+  persistAdded(book) { const s = this.load(); s.added = s.added || []; s.added.push(book); this.save(s); }
+  removeAdded(id) {
+    const s = this.load();
+    s.added = (s.added || []).filter(b => b.id !== id);
+    if (s.overrides) delete s.overrides[id];
+    this.save(s);
+  }
+
+  PALETTE = ['#9c4f30', '#b07d3f', '#8a5a3a', '#5f7150', '#4f6b6b', '#5c6b8a', '#8a5a6b', '#6b5a8a', '#a35545'];
+  THEME_COLORS = { Narrativa: '#9c4f30', Storia: '#8a5a3a', Mare: '#4f6b8a', Scienze: '#5f7150', Poesia: '#8a5a6b', Biografie: '#b07d3f', Saggi: '#6b5a8a', Mafia: '#7a3a30', Arte: '#5c6b8a', Lodi: '#5f7150', Ragazzi: '#cf9444', Sociologia: '#6b5a8a', Varie: '#7a6b5a' };
+  SX_CELL_CAT = { E1: 'Mare', E2: 'Storia', E3: 'Storia', E4: 'Storia', E5: 'Mare', E6: 'Scienze', E7: 'Poesia', F1: 'Lodi', F2: '', F3: '', F4: '', F5: '', F6: '', F7: '', G1: 'Lodi', G2: 'Saggi', G3: 'Mafia', G4: 'Biografie', G5: 'Biografie', G6: 'Biografie', G7: 'Arte' };
+  CAT_ORDER = ['Narrativa', 'Storia', 'Mare', 'Scienze', 'Poesia', 'Biografie', 'Saggi', 'Mafia', 'Arte', 'Lodi', 'Ragazzi'];
+
+  spine(seed) { let h = 0; const s = seed || ''; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return this.PALETTE[h % this.PALETTE.length]; }
+  initial(b) { const s = b.lastName || b.title || '?'; return (s[0] || '?').toUpperCase(); }
+  cover(b, size) { return b.isbn ? ('https://covers.openlibrary.org/b/isbn/' + b.isbn + '-' + (size || 'M') + '.jpg?default=false') : ''; }
+  sxTheme(code) { if (!code) return 'Varie'; const m = code.match(/^E\d+\s+([A-Za-zàèéìòù]+)/); if (m) return m[1]; return code.replace(/\s*\d+$/, '').trim() || 'Varie'; }
+
+  sideLabel(b) { return b.side === 'DX' ? 'Scaffale destro' : b.side === 'SX' ? 'Scaffale sinistro' : b.side === 'Laura' ? 'Sezione Laura' : (b.side || '—'); }
+  cellOf(b) { if (b.cell) return b.cell; const m = (b.sector || '').match(/^([A-G])\s*(\d)/); return m ? (m[1] + m[2]) : ''; }
+  cellCat(code) { if (!code) return ''; if (/^[A-D]/.test(code)) return 'Narrativa'; return this.SX_CELL_CAT[code] || ''; }
+  catOf(b) { if (b.category) return b.category; if (b.side === 'DX') return 'Narrativa'; if (b.side === 'Laura') return 'Ragazzi'; return this.cellCat(this.cellOf(b)); }
+  shortLoc(b) { const c = this.cellOf(b); if (c) return c; if (b.side === 'Laura') return 'Laura'; return '—'; }
+  chip(b) {
+    if (b.side === 'Laura') return 'Ragazzi';
+    const cat = this.catOf(b); const c = this.cellOf(b);
+    return (cat || (b.side === 'DX' ? 'Destro' : 'Sinistro')) + (c ? ' · ' + c : '');
+  }
+  locationLine(b) {
+    const c = this.cellOf(b);
+    if (b.side === 'Laura') return 'Libri per ragazzi';
+    if (c) return 'Colonna ' + c[0] + ' · Ripiano ' + c.slice(1);
+    return b.sector || '—';
+  }
+
+  coverEl(b, size) {
+    if (!b.isbn) return null;
+    return React.createElement('img', {
+      src: this.cover(b, size), onError: this.imgErr, alt: '',
+      style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }
+    });
+  }
+
+  vm(b) {
+    return {
+      id: b.id, title: b.title || '(senza titolo)', author: b.author || 'Autore ignoto',
+      meta: [b.publisher, b.year].filter(Boolean).join(' · '),
+      chip: this.chip(b), shortLoc: this.shortLoc(b),
+      coverEl: this.coverEl(b, 'M'),
+      spine: this.spine(b.id + b.title), initial: this.initial(b),
+      onOpen: () => this.setState({ detailId: b.id })
+    };
+  }
+
+  updateDraft(field, val) { this.setState(s => ({ draft: Object.assign({}, s.draft, { [field]: val }) })); }
+
+  yearOf(s) { if (!s) return ''; const m = String(s).match(/(\d{4})/); return m ? m[1] : ''; }
+
+  async tryGoogle(raw) {
+    try {
+      const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + raw);
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (j.totalItems > 0 && j.items && j.items[0].volumeInfo) {
+        const v = j.items[0].volumeInfo;
+        return { title: v.title || '', author: (v.authors || []).join(', '), publisher: v.publisher || '', year: this.yearOf(v.publishedDate) };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  async tryOpenLibrary(raw) {
+    try {
+      const r = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + raw + '&format=json&jscmd=data');
+      if (!r.ok) return null;
+      const j = await r.json();
+      const d = j['ISBN:' + raw];
+      if (d && d.title) {
+        return {
+          title: d.title || '',
+          author: (d.authors || []).map(a => a.name).join(', '),
+          publisher: (d.publishers && d.publishers[0] && d.publishers[0].name) || '',
+          year: this.yearOf(d.publish_date)
+        };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  doLookup(isbnArg) {
+    const raw = (isbnArg != null ? isbnArg : this.state.isbnInput).replace(/[^0-9Xx]/g, '');
+    if (raw.length !== 10 && raw.length !== 13) { this.setState({ lookupState: 'error' }); return; }
+    this.setState({ lookupState: 'loading' });
+    (async () => {
+      let info = await this.tryGoogle(raw);
+      if (!info) info = await this.tryOpenLibrary(raw);
+      if (info) {
+        this.setState({ draft: { title: info.title, author: info.author, publisher: info.publisher, year: info.year, isbn: raw, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'found', isbnInput: '' });
+      } else {
+        this.setState({ draft: { title: '', author: '', publisher: '', year: '', isbn: raw, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'missed', isbnInput: '' });
+      }
+    })();
+  }
+
+  saveBook() {
+    const d = this.state.draft;
+    if (!d || !d.title.trim() || !d.sector.trim()) return;
+    const code = d.sector.trim();
+    const parts = (d.author || '').split(',');
+    const book = {
+      id: 'u' + Date.now(), title: d.title.trim(), author: d.author.trim(),
+      lastName: (parts[0] || '').trim(), firstName: (parts[1] || '').trim(),
+      publisher: d.publisher.trim(), year: d.year.trim(), isbn: d.isbn.trim().replace(/[^0-9Xx]/g, ''),
+      side: d.side, sector: code, cell: (d.side === 'Laura' ? '' : code), category: (d.side === 'DX' ? 'Narrativa' : d.side === 'Laura' ? 'Ragazzi' : this.cellCat(code)), notes: '', added: true
+    };
+    this.persistAdded(book);
+    this.setState(s => ({ books: s.books.concat([book]), addStep: 'choose', draft: null, lookupState: 'idle', tab: 'cerca', detailId: book.id, toast: '“' + book.title + '” aggiunto alla biblioteca' }));
+    clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 2800);
+  }
+
+  renderVals() {
+    const st = this.state;
+    const books = st.books;
+    const q = st.query.trim().toLowerCase();
+    const tab = st.tab;
+    const imgErr = this.imgErr;
+
+    // ---- search results ----
+    let results = [], resultCount = 0, resultMore = 0;
+    if (q) {
+      const tokens = q.split(/\s+/).filter(Boolean);
+      const f = books.filter(b => {
+        const hay = ((b.title || '') + ' ' + (b.author || '') + ' ' + (b.publisher || '')).toLowerCase();
+        return tokens.every(t => hay.indexOf(t) >= 0);
+      });
+      resultCount = f.length;
+      results = f.slice(0, 60).map(b => this.vm(b));
+      resultMore = Math.max(0, f.length - 60);
+    }
+
+    // ---- recent ----
+    const recent = books.filter(b => b.added).slice(-4).reverse().map(b => this.vm(b));
+
+    // ---- browse (only when needed) ----
+    let columnsDX = [], columnsSX = [], catGroups = [], authorGroups = [], lauraCount = 0;
+    if (tab === 'sfoglia') {
+      lauraCount = books.filter(b => b.side === 'Laura').length;
+      if (st.browseMode === 'scaffali') {
+        const buildGrid = (side, colLetters) => {
+          const counts = {};
+          books.filter(b => b.side === side).forEach(b => { const c = this.cellOf(b); if (c) counts[c] = (counts[c] || 0) + 1; });
+          return colLetters.map(L => ({
+            letter: L,
+            cells: [1, 2, 3, 4, 5, 6, 7].map(n => {
+              const code = L + n;
+              const cat = side === 'DX' ? 'Narrativa' : (this.SX_CELL_CAT[code] || '');
+              const count = counts[code] || 0;
+              return {
+                key: code, label: code, cat: cat || '—', count: count,
+                cellOpacity: count === 0 ? '0.45' : '1',
+                onOpen: () => this.setState({ sector: { type: 'cell', side: side, value: code, title: (side === 'DX' ? 'Scaffale destro' : 'Scaffale sinistro') + ' · ' + code, sub: (cat ? cat + ' · ' : '') + count + (count === 1 ? ' libro' : ' libri') } })
+              };
+            })
+          }));
+        };
+        columnsDX = buildGrid('DX', ['A', 'B', 'C', 'D']);
+        columnsSX = buildGrid('SX', ['E', 'F', 'G']);
+      } else if (st.browseMode === 'categorie') {
+        const byCat = {};
+        books.forEach(b => { const c = this.catOf(b); if (c) (byCat[c] = byCat[c] || []).push(b); });
+        const ordered = this.CAT_ORDER.filter(c => byCat[c]).concat(Object.keys(byCat).filter(c => this.CAT_ORDER.indexOf(c) < 0).sort());
+        catGroups = ordered.map(c => ({
+          key: c, label: c, count: byCat[c].length, color: this.THEME_COLORS[c] || '#7a6b5a',
+          onOpen: () => this.setState({ sector: { type: 'category', value: c, title: 'Categoria', sub: c + ' · ' + byCat[c].length + (byCat[c].length === 1 ? ' libro' : ' libri') } })
+        }));
+      } else {
+        const sorted = books.slice().sort((a, b) => (a.lastName || a.title || '').localeCompare(b.lastName || b.title || '', 'it'));
+        const groups = {};
+        const order = [];
+        sorted.forEach(b => {
+          let L = (b.lastName || b.title || '#')[0].toUpperCase();
+          if (!/[A-Z]/.test(L)) L = '#';
+          if (!groups[L]) { groups[L] = []; order.push(L); }
+          groups[L].push(this.vm(b));
+        });
+        authorGroups = order.map(L => ({ letter: L, books: groups[L] }));
+      }
+    }
+
+    // ---- sector overlay ----
+    let sectorBooks = [], sectorTitle = '', sectorSubtitle = '';
+    if (st.sector) {
+      const sec = st.sector;
+      let list = [];
+      if (sec.type === 'cell') list = books.filter(b => b.side === sec.side && this.cellOf(b) === sec.value);
+      else if (sec.type === 'category') list = books.filter(b => this.catOf(b) === sec.value);
+      else if (sec.type === 'laura') list = books.filter(b => b.side === 'Laura');
+      list.sort((a, b) => (a.lastName || a.title || '').localeCompare(b.lastName || b.title || '', 'it'));
+      sectorBooks = list.map(b => this.vm(b));
+      sectorTitle = sec.title;
+      sectorSubtitle = sec.sub || (sectorBooks.length + ' libri');
+    }
+
+    // ---- detail ----
+    let detailVals = {};
+    const db = st.detailId ? books.find(b => b.id === st.detailId) : null;
+    if (db) {
+      detailVals = {
+        detailTitle: db.title || '(senza titolo)',
+        detailAuthor: db.author || 'Autore ignoto',
+        detailPublisher: (db.publisher || '').toUpperCase(),
+        detailPublisherOr: db.publisher || '—',
+        detailYearOr: db.year || '—',
+        detailIsbnOr: db.isbn || '—',
+        detailSideLabel: this.sideLabel(db),
+        detailLocation: this.locationLine(db),
+        detailCategory: this.catOf(db) || '—',
+        detailCoverEl: this.coverEl(db, 'L'),
+        detailSpine: this.spine(db.id + db.title),
+        detailNotes: db.notes || '',
+        detailDeletable: !!db.added,
+        onNote: (e) => {
+          const val = e.target.value;
+          this.setState(s => ({ books: s.books.map(x => x.id === db.id ? Object.assign({}, x, { notes: val }) : x) }));
+          this.persistOverride(db.id, val);
+        },
+        deleteBook: () => { this.removeAdded(db.id); this.setState(s => ({ books: s.books.filter(x => x.id !== db.id), detailId: null, toast: 'Libro eliminato' })); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 2200); }
+      };
+    }
+
+    // ---- add: side pills + sector chips ----
+    const d = st.draft;
+    const sideDefs = [{ label: 'Destro\n(Narrativa)', value: 'DX' }, { label: 'Sinistro\n(per categoria)', value: 'SX' }, { label: 'Laura', value: 'Laura' }];
+    const curSide = d ? d.side : 'DX';
+    const sidePills = sideDefs.map(p => {
+      const active = curSide === p.value;
+      return {
+        label: p.label, value: p.value,
+        bg: active ? '#9c4f30' : '#fffdf8', color: active ? '#fff' : '#6f6353', border: active ? '#9c4f30' : '#e2d5bd',
+        onPick: () => this.updateDraft('side', p.value)
+      };
+    });
+    let sectorChips = [];
+    if (d) {
+      const cur = (d.sector || '').trim();
+      let cells = [];
+      if (curSide === 'DX') ['A', 'B', 'C', 'D'].forEach(L => [1, 2, 3, 4, 5, 6, 7].forEach(n => cells.push(L + n)));
+      else if (curSide === 'SX') ['E', 'F', 'G'].forEach(L => [1, 2, 3, 4, 5, 6, 7].forEach(n => cells.push(L + n)));
+      else cells = ['Laura'];
+      sectorChips = cells.map(c => {
+        const active = cur === c;
+        const cat = curSide === 'Laura' ? 'Ragazzi' : this.cellCat(c);
+        const label = curSide === 'DX' ? c : (cat ? c + ' · ' + cat : c);
+        return { label: label, value: c, bg: active ? '#9c4f30' : '#f4e8d6', color: active ? '#fff' : '#9c5a3c', border: active ? '#9c4f30' : '#eaddc6', onPick: () => this.updateDraft('sector', c) };
+      });
+    }
+    const sectorPlaceholder = curSide === 'DX' ? 'es. A2' : curSide === 'SX' ? 'es. E2' : 'es. Laura';
+    const sectorHint = curSide === 'DX'
+      ? 'Tutto lo scaffale destro è Narrativa. Scegli la casella (colonna A–D, ripiano 1–7).'
+      : curSide === 'SX'
+        ? 'Scegli la casella (colonna E–G, ripiano 1–7): la categoria viene assegnata in automatico.'
+        : 'Libri per ragazzi.';
+    const canSave = !!(d && d.title.trim() && d.sector.trim());
+
+    const dh = {
+      title: (e) => this.updateDraft('title', e.target.value),
+      author: (e) => this.updateDraft('author', e.target.value),
+      publisher: (e) => this.updateDraft('publisher', e.target.value),
+      year: (e) => this.updateDraft('year', e.target.value),
+      isbn: (e) => this.updateDraft('isbn', e.target.value),
+      sector: (e) => this.updateDraft('sector', e.target.value)
+    };
+
+    const draftCoverEl = d && d.isbn
+      ? React.createElement('img', { src: 'https://covers.openlibrary.org/b/isbn/' + d.isbn.replace(/[^0-9Xx]/g, '') + '-M.jpg?default=false', onError: this.imgErr, alt: '', style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } })
+      : null;
+
+    return {
+      isLoading: !st.loaded,
+      isReady: st.loaded,
+      total: books.length,
+
+      // tabs
+      isCerca: tab === 'cerca', isSfoglia: tab === 'sfoglia', isAggiungi: tab === 'aggiungi',
+      navCerca: () => this.setState({ tab: 'cerca' }),
+      navSfoglia: () => this.setState({ tab: 'sfoglia' }),
+      navAggiungi: () => this.setState({ tab: 'aggiungi', addStep: 'choose', draft: null, lookupState: 'idle' }),
+      cercaColor: tab === 'cerca' ? '#9c4f30' : '#b3a48d',
+      sfogliaColor: tab === 'sfoglia' ? '#9c4f30' : '#b3a48d',
+      aggiungiColor: tab === 'aggiungi' ? '#9c4f30' : '#b3a48d',
+
+      // search
+      query: st.query,
+      onQuery: (e) => this.setState({ query: e.target.value }),
+      clearQuery: () => this.setState({ query: '' }),
+      hasQuery: q.length > 0,
+      showShortcuts: q.length === 0,
+      hasResults: q.length > 0 && resultCount > 0,
+      noResults: q.length > 0 && resultCount === 0,
+      results, resultCount, hasMore: resultMore > 0, resultMore,
+      hasRecent: recent.length > 0, recentAdded: recent,
+      goScaffali: () => this.setState({ tab: 'sfoglia', browseMode: 'scaffali' }),
+      goTemi: () => this.setState({ tab: 'sfoglia', browseMode: 'categorie' }),
+      goAddFromSearch: () => this.setState({ tab: 'aggiungi', addStep: 'choose', draft: null }),
+      imgErr,
+
+      // browse
+      scaffaliTabBg: st.browseMode === 'scaffali' ? '#fffdf8' : 'transparent',
+      scaffaliTabColor: st.browseMode === 'scaffali' ? '#9c4f30' : '#8d7c66',
+      categorieTabBg: st.browseMode === 'categorie' ? '#fffdf8' : 'transparent',
+      categorieTabColor: st.browseMode === 'categorie' ? '#9c4f30' : '#8d7c66',
+      autoriTabBg: st.browseMode === 'autori' ? '#fffdf8' : 'transparent',
+      autoriTabColor: st.browseMode === 'autori' ? '#9c4f30' : '#8d7c66',
+      setScaffali: () => this.setState({ browseMode: 'scaffali' }),
+      setCategorie: () => this.setState({ browseMode: 'categorie' }),
+      setAutori: () => this.setState({ browseMode: 'autori' }),
+      isScaffaliMode: st.browseMode === 'scaffali',
+      isCategorieMode: st.browseMode === 'categorie',
+      isAutoriMode: st.browseMode === 'autori',
+      columnsDX, columnsSX, catGroups, authorGroups,
+      hasLaura: lauraCount > 0, lauraCount,
+      openLaura: () => this.setState({ sector: { type: 'laura', title: 'Sezione Laura', sub: lauraCount + ' libri per ragazzi' } }),
+
+      // sector overlay
+      isSectorOpen: !!st.sector,
+      closeSector: () => this.setState({ sector: null }),
+      sectorBooks, sectorTitle, sectorSubtitle,
+
+      // detail
+      isDetailOpen: !!db,
+      closeBook: () => this.setState({ detailId: null }),
+      ...detailVals,
+
+      // add
+      isChoose: st.addStep === 'choose',
+      isScan: st.addStep === 'scan',
+      isIsbn: st.addStep === 'isbn',
+      isReview: st.addStep === 'review',
+      startScan: () => this.setState({ addStep: 'scan' }),
+      startIsbn: () => this.setState({ addStep: 'isbn', isbnInput: '', lookupState: 'idle' }),
+      startManual: () => this.setState({ addStep: 'review', lookupState: 'manual', draft: { title: '', author: '', publisher: '', year: '', isbn: '', side: 'DX', sector: '' } }),
+      backToChoose: () => this.setState({ addStep: 'choose', draft: null, lookupState: 'idle', isbnInput: '' }),
+      simulateScan: () => this.doLookup('9780140328721'),
+      isbnInput: st.isbnInput,
+      onIsbnInput: (e) => this.setState({ isbnInput: e.target.value, lookupState: 'idle' }),
+      doLookup: () => this.doLookup(),
+      lookupLoading: st.lookupState === 'loading',
+      lookupErrored: st.lookupState === 'error',
+      lookupBtnBg: st.lookupState === 'loading' ? '#c08a6a' : '#9c4f30',
+      lookupBtnLabel: st.lookupState === 'loading' ? 'Cerco…' : 'Cerca dati',
+      lookupFound: st.lookupState === 'found',
+      lookupMissed: st.lookupState === 'missed',
+      draftCoverEl,
+      d_title: d ? d.title : '', d_author: d ? d.author : '', d_publisher: d ? d.publisher : '',
+      d_year: d ? d.year : '', d_isbn: d ? d.isbn : '', d_side: curSide, d_sector: d ? d.sector : '',
+      dh, sidePills, sectorChips, hasSectorChips: sectorChips.length > 0,
+      sectorPlaceholder, sectorHint,
+      saveBook: () => this.saveBook(), saveBg: canSave ? '#9c4f30' : '#cdbfa6',
+
+      // toast
+      hasToast: !!st.toast, toastMsg: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>
