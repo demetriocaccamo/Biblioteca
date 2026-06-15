@@ -325,7 +325,8 @@
           <sc-if value="{{ lookupLoading }}"><span style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:biblioSpin 0.7s linear infinite"></span></sc-if>
           {{ lookupBtnLabel }}
         </button>
-        <button onClick="{{ backToChoose }}" style="margin-top:10px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Indietro</button>
+        <button onClick="{{ startManualFromIsbn }}" style="margin-top:10px;width:100%;background:transparent;color:#9c4f30;border:none;padding:8px;font-size:14px;font-weight:600;cursor:pointer">Inserisci i dati a mano →</button>
+        <button onClick="{{ backToChoose }}" style="margin-top:2px;width:100%;background:transparent;color:#b3a48d;border:none;padding:6px;font-size:13px;cursor:pointer">Annulla</button>
       </div>
       </sc-if>
 
@@ -341,7 +342,20 @@
           </div>
         </sc-if>
         <sc-if value="{{ lookupMissed }}">
-          <div style="background:#f6ece0;border-radius:13px;padding:12px 14px;margin-bottom:16px;font-size:13.5px;color:#9c5a3c;line-height:1.4">Nessun dato trovato per questo ISBN. Compila i campi a mano.</div>
+          <div style="background:#f6ece0;border-radius:13px;padding:13px 15px;margin-bottom:16px;font-size:13.5px;color:#9c5a3c;line-height:1.6">
+            📚 Libro non trovato nei database online.<br>
+            <span style="color:#7a4a28;font-weight:600">1.</span> Scrivi il titolo nel campo qui sotto<br>
+            <span style="color:#7a4a28;font-weight:600">2.</span> Scorri in basso e scegli dove riporlo<br>
+            <span style="color:#7a4a28;font-weight:600">3.</span> Premi <strong>Salva nella biblioteca</strong>
+          </div>
+        </sc-if>
+        <sc-if value="{{ lookupManual }}">
+          <div style="background:#e7ede0;border-radius:13px;padding:13px 15px;margin-bottom:16px;font-size:13.5px;color:#46553c;line-height:1.6">
+            ✏️ Inserimento manuale.<br>
+            <span style="color:#3a5030;font-weight:600">1.</span> Compila titolo e autore<br>
+            <span style="color:#3a5030;font-weight:600">2.</span> Scorri in basso e scegli dove riporlo<br>
+            <span style="color:#3a5030;font-weight:600">3.</span> Premi <strong>Salva nella biblioteca</strong>
+          </div>
         </sc-if>
 
         <div style="display:flex;flex-direction:column;gap:13px">
@@ -715,9 +729,8 @@ class Component extends DCLogic {
     if (raw.length !== 10 && raw.length !== 13) { this.setState({ lookupState: 'error' }); return; }
     this.setState({ lookupState: 'loading' });
     (async () => {
-      let info = await this.tryGoogle(raw);
-      if (!info) info = await this.tryOpenLibrary(raw);
-      if (!info) info = await this.tryOpenLibrarySearch(raw);
+      const results = await Promise.all([this.tryGoogle(raw), this.tryOpenLibrary(raw), this.tryOpenLibrarySearch(raw)]);
+      const info = results.find(r => r !== null) || null;
       if (info) {
         this.setState({ draft: { title: info.title, author: info.author, publisher: info.publisher, year: info.year, isbn: raw, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'found', isbnInput: '' });
       } else {
@@ -1004,6 +1017,11 @@ class Component extends DCLogic {
       lookupBtnLabel: st.lookupState === 'loading' ? 'Cerco…' : 'Cerca dati',
       lookupFound: st.lookupState === 'found',
       lookupMissed: st.lookupState === 'missed',
+      lookupManual: st.lookupState === 'manual',
+      startManualFromIsbn: () => {
+        const isbn = st.isbnInput.replace(/[^0-9Xx]/g, '');
+        this.setState({ draft: { title: '', author: '', publisher: '', year: '', isbn, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'manual', isbnInput: '' });
+      },
       draftCoverEl,
       d_title: d ? d.title : '', d_author: d ? d.author : '', d_publisher: d ? d.publisher : '',
       d_year: d ? d.year : '', d_isbn: d ? d.isbn : '', d_side: curSide, d_sector: d ? d.sector : '',
