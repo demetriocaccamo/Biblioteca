@@ -291,9 +291,23 @@
       <!-- scan -->
       <sc-if value="{{ isScan }}">
       <div style="margin-top:18px">
-        <div id="biblio-qr-region" style="width:100%;border-radius:18px;overflow:hidden;background:#1d150e;min-height:220px"></div>
+        <div style="background:#1d150e;border-radius:18px;padding:36px 20px;text-align:center">
+          <div style="font-size:52px;margin-bottom:14px">📷</div>
+          <div style="font-family:'Spectral',serif;font-size:18px;font-weight:600;color:#f3ead9;margin-bottom:8px">Scansiona il codice ISBN</div>
+          <div style="font-size:13px;color:rgba(243,234,217,0.7);line-height:1.6">Premi il pulsante, fotografa il codice a barre<br>sul retro del libro, poi attendi il risultato.</div>
+          <sc-if value="{{ scanLoading }}">
+            <div style="margin-top:22px;display:flex;align-items:center;justify-content:center;gap:10px;color:rgba(243,234,217,0.85)">
+              <span style="width:18px;height:18px;border:2px solid rgba(255,255,255,0.25);border-top-color:#cf9444;border-radius:50%;animation:biblioSpin 0.7s linear infinite;display:inline-block;flex-shrink:0"></span>
+              <span style="font-size:14px">Decifrando il codice…</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{ !scanLoading }}">
+            <button onClick="{{ triggerCamera }}" style="margin-top:22px;background:#cf9444;color:#1d150e;border:none;border-radius:13px;padding:14px 32px;font-size:15px;font-weight:700;cursor:pointer">Apri fotocamera</button>
+          </sc-if>
+        </div>
+        <input type="file" id="biblio-scan-input" accept="image/*" capture="environment" onChange="{{ onScanFile }}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
         <sc-if value="{{ scanError }}">
-          <div style="margin-top:12px;background:#f6ece0;border-radius:13px;padding:12px 14px;font-size:13.5px;color:#9c5a3c;line-height:1.4">{{ scanError }}<br><span style="font-size:12px;color:#a2917a">Usa "Inserisci l'ISBN" per aggiungere il libro manualmente.</span></div>
+          <div style="margin-top:12px;background:#f6ece0;border-radius:13px;padding:12px 14px;font-size:13.5px;color:#9c5a3c;line-height:1.4">{{ scanError }}<br><span style="font-size:12px;color:#a2917a">Prova a fotografare il codice da più vicino, oppure usa "Inserisci l'ISBN" manualmente.</span></div>
         </sc-if>
         <button onClick="{{ backToChoose }}" style="margin-top:12px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Annulla</button>
       </div>
@@ -492,7 +506,7 @@ class Component extends DCLogic {
   state = {
     loaded: false, books: [], tab: 'cerca', query: '',
     detailId: null, browseMode: 'scaffali', sector: null,
-    addStep: 'choose', isbnInput: '', lookupState: 'idle', draft: null, toast: null, scanError: null
+    addStep: 'choose', isbnInput: '', lookupState: 'idle', draft: null, toast: null, scanError: null, scanLoading: false
   };
 
   KEY = 'biblioteca_v1';
@@ -569,49 +583,24 @@ class Component extends DCLogic {
     };
   }
 
-  _scanner = null;
-  _scannerRunning = false;
+  triggerCamera() {
+    const inp = document.getElementById('biblio-scan-input');
+    if (inp) { inp.value = ''; inp.click(); }
+  }
 
-  async _startScanner() {
-    if (this._scannerRunning) return;
+  onScanFile(e) {
+    const file = e && e.target && e.target.files && e.target.files[0];
+    if (!file) return;
     const Html5Qrcode = window.Html5Qrcode;
-    if (!Html5Qrcode) { this.setState({ scanError: 'Libreria scanner non disponibile.' }); return; }
-    const el = document.getElementById('biblio-qr-region');
-    if (!el) return;
-    try {
-      this._scanner = new Html5Qrcode('biblio-qr-region');
-      await this._scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 240, height: 100 } },
-        (text) => { this._stopScanner(); this.doLookup(text); },
-        () => {}
-      );
-      this._scannerRunning = true;
-    } catch (e) {
-      const msg = (e && e.message) || String(e);
-      const friendly = msg.includes('Permission') || msg.includes('permission') || msg.includes('NotAllowed')
-        ? 'Accesso alla fotocamera negato. Controlla i permessi nelle impostazioni del telefono.'
-        : 'Impossibile aprire la fotocamera: ' + msg;
-      this.setState({ scanError: friendly });
-    }
+    if (!Html5Qrcode) { this.setState({ scanError: 'Libreria scanner non disponibile. Usa "Inserisci l\'ISBN".' }); return; }
+    this.setState({ scanLoading: true, scanError: null });
+    let scanDiv = document.getElementById('biblio-qr-hidden');
+    if (!scanDiv) { scanDiv = document.createElement('div'); scanDiv.id = 'biblio-qr-hidden'; scanDiv.style.display = 'none'; document.body.appendChild(scanDiv); }
+    const scanner = new Html5Qrcode('biblio-qr-hidden');
+    scanner.scanFile(file, false)
+      .then(text => { this.setState({ scanLoading: false }); this.doLookup(text); })
+      .catch(() => { this.setState({ scanLoading: false, scanError: 'Codice a barre non riconosciuto. Avvicinati al codice e riprova.' }); });
   }
-
-  async _stopScanner() {
-    if (this._scanner && this._scannerRunning) {
-      try { await this._scanner.stop(); } catch (e) {}
-      this._scannerRunning = false;
-    }
-  }
-
-  componentDidUpdate() {
-    if (this.state.addStep === 'scan' && !this._scannerRunning) {
-      setTimeout(() => this._startScanner(), 80);
-    } else if (this.state.addStep !== 'scan') {
-      this._stopScanner();
-    }
-  }
-
-  componentWillUnmount() { this._stopScanner(); }
 
   updateDraft(field, val) { this.setState(s => ({ draft: Object.assign({}, s.draft, { [field]: val }) })); }
 
@@ -902,12 +891,15 @@ class Component extends DCLogic {
       isChoose: st.addStep === 'choose',
       isScan: st.addStep === 'scan',
       scanError: st.scanError || null,
+      scanLoading: !!st.scanLoading,
+      triggerCamera: () => this.triggerCamera(),
+      onScanFile: (e) => this.onScanFile(e),
       isIsbn: st.addStep === 'isbn',
       isReview: st.addStep === 'review',
-      startScan: () => this.setState({ addStep: 'scan', scanError: null }),
+      startScan: () => this.setState({ addStep: 'scan', scanError: null, scanLoading: false }),
       startIsbn: () => this.setState({ addStep: 'isbn', isbnInput: '', lookupState: 'idle' }),
       startManual: () => this.setState({ addStep: 'review', lookupState: 'manual', draft: { title: '', author: '', publisher: '', year: '', isbn: '', side: 'DX', sector: '' } }),
-      backToChoose: () => this.setState({ addStep: 'choose', draft: null, lookupState: 'idle', isbnInput: '', scanError: null }),
+      backToChoose: () => this.setState({ addStep: 'choose', draft: null, lookupState: 'idle', isbnInput: '', scanError: null, scanLoading: false }),
       simulateScan: () => this.doLookup('9780140328721'),
       isbnInput: st.isbnInput,
       onIsbnInput: (e) => this.setState({ isbnInput: e.target.value, lookupState: 'idle' }),
