@@ -10,6 +10,7 @@
   }
 </script>
 <script src="./support.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
 <x-dc>
@@ -290,20 +291,11 @@
       <!-- scan -->
       <sc-if value="{{ isScan }}">
       <div style="margin-top:18px">
-        <div style="position:relative;width:100%;aspect-ratio:3/4;max-height:46vh;background:#1d150e;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center">
-          <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 45%, rgba(120,90,55,0.35), #140d08 80%)"></div>
-          <div style="position:relative;width:78%;height:46%;border:2px solid rgba(243,234,217,0.55);border-radius:10px">
-            <div style="position:absolute;left:0;right:0;height:2px;background:#cf9444;box-shadow:0 0 10px 2px rgba(207,148,68,0.6);animation:biblioScan 2.4s ease-in-out infinite"></div>
-            <div style="position:absolute;top:-2px;left:-2px;width:22px;height:22px;border-top:3px solid #cf9444;border-left:3px solid #cf9444;border-radius:6px 0 0 0"></div>
-            <div style="position:absolute;top:-2px;right:-2px;width:22px;height:22px;border-top:3px solid #cf9444;border-right:3px solid #cf9444;border-radius:0 6px 0 0"></div>
-            <div style="position:absolute;bottom:-2px;left:-2px;width:22px;height:22px;border-bottom:3px solid #cf9444;border-left:3px solid #cf9444;border-radius:0 0 0 6px"></div>
-            <div style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-bottom:3px solid #cf9444;border-right:3px solid #cf9444;border-radius:0 0 6px 0"></div>
-          </div>
-          <div style="position:absolute;bottom:14px;left:0;right:0;text-align:center;color:rgba(243,234,217,0.85);font-size:13px">Inquadra il codice a barre sul retro del libro</div>
-        </div>
-        <div style="margin-top:14px;font-size:12.5px;color:#a2917a;text-align:center;line-height:1.5">Nell'app installata sul telefono qui si apre la fotocamera.<br>Per la demo, simula una scansione:</div>
-        <button onClick="{{ simulateScan }}" style="margin-top:14px;width:100%;background:#9c4f30;color:#fff;border:none;border-radius:13px;padding:14px;font-size:15px;font-weight:600;cursor:pointer">Simula scansione</button>
-        <button onClick="{{ backToChoose }}" style="margin-top:10px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Annulla</button>
+        <div id="biblio-qr-region" style="width:100%;border-radius:18px;overflow:hidden;background:#1d150e;min-height:220px"></div>
+        <sc-if value="{{ scanError }}">
+          <div style="margin-top:12px;background:#f6ece0;border-radius:13px;padding:12px 14px;font-size:13.5px;color:#9c5a3c;line-height:1.4">{{ scanError }}<br><span style="font-size:12px;color:#a2917a">Usa "Inserisci l'ISBN" per aggiungere il libro manualmente.</span></div>
+        </sc-if>
+        <button onClick="{{ backToChoose }}" style="margin-top:12px;width:100%;background:transparent;color:#8d7c66;border:none;padding:8px;font-size:14px;cursor:pointer">Annulla</button>
       </div>
       </sc-if>
 
@@ -500,7 +492,7 @@ class Component extends DCLogic {
   state = {
     loaded: false, books: [], tab: 'cerca', query: '',
     detailId: null, browseMode: 'scaffali', sector: null,
-    addStep: 'choose', isbnInput: '', lookupState: 'idle', draft: null, toast: null
+    addStep: 'choose', isbnInput: '', lookupState: 'idle', draft: null, toast: null, scanError: null
   };
 
   KEY = 'biblioteca_v1';
@@ -577,13 +569,63 @@ class Component extends DCLogic {
     };
   }
 
+  _scanner = null;
+  _scannerRunning = false;
+
+  async _startScanner() {
+    if (this._scannerRunning) return;
+    const Html5Qrcode = window.Html5Qrcode;
+    if (!Html5Qrcode) { this.setState({ scanError: 'Libreria scanner non disponibile.' }); return; }
+    const el = document.getElementById('biblio-qr-region');
+    if (!el) return;
+    try {
+      this._scanner = new Html5Qrcode('biblio-qr-region');
+      await this._scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 240, height: 100 } },
+        (text) => { this._stopScanner(); this.doLookup(text); },
+        () => {}
+      );
+      this._scannerRunning = true;
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      const friendly = msg.includes('Permission') || msg.includes('permission') || msg.includes('NotAllowed')
+        ? 'Accesso alla fotocamera negato. Controlla i permessi nelle impostazioni del telefono.'
+        : 'Impossibile aprire la fotocamera: ' + msg;
+      this.setState({ scanError: friendly });
+    }
+  }
+
+  async _stopScanner() {
+    if (this._scanner && this._scannerRunning) {
+      try { await this._scanner.stop(); } catch (e) {}
+      this._scannerRunning = false;
+    }
+  }
+
+  componentDidUpdate() {
+    if (this.state.addStep === 'scan' && !this._scannerRunning) {
+      setTimeout(() => this._startScanner(), 80);
+    } else if (this.state.addStep !== 'scan') {
+      this._stopScanner();
+    }
+  }
+
+  componentWillUnmount() { this._stopScanner(); }
+
   updateDraft(field, val) { this.setState(s => ({ draft: Object.assign({}, s.draft, { [field]: val }) })); }
 
   yearOf(s) { if (!s) return ''; const m = String(s).match(/(\d{4})/); return m ? m[1] : ''; }
 
+  fetchWithTimeout(url, ms) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+  }
+
   async tryGoogle(raw) {
     try {
-      const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + raw);
+      const r = await this.fetchWithTimeout('https://www.googleapis.com/books/v1/volumes?q=isbn:' + raw, 5000);
       if (!r.ok) return null;
       const j = await r.json();
       if (j.totalItems > 0 && j.items && j.items[0].volumeInfo) {
@@ -596,7 +638,7 @@ class Component extends DCLogic {
 
   async tryOpenLibrary(raw) {
     try {
-      const r = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + raw + '&format=json&jscmd=data');
+      const r = await this.fetchWithTimeout('https://openlibrary.org/api/books?bibkeys=ISBN:' + raw + '&format=json&jscmd=data', 5000);
       if (!r.ok) return null;
       const j = await r.json();
       const d = j['ISBN:' + raw];
@@ -636,7 +678,7 @@ class Component extends DCLogic {
       id: 'u' + Date.now(), title: d.title.trim(), author: d.author.trim(),
       lastName: (parts[0] || '').trim(), firstName: (parts[1] || '').trim(),
       publisher: d.publisher.trim(), year: d.year.trim(), isbn: d.isbn.trim().replace(/[^0-9Xx]/g, ''),
-      side: d.side, sector: code, cell: (d.side === 'Laura' ? '' : code), category: (d.side === 'DX' ? 'Narrativa' : d.side === 'Laura' ? 'Ragazzi' : this.cellCat(code)), notes: '', added: true
+      side: d.side, sector: code, cell: (d.side === 'Laura' ? '' : code), category: (d.side === 'DX' ? (code === 'C3' ? 'Prime edizioni' : 'Narrativa') : d.side === 'Laura' ? 'Ragazzi' : this.cellCat(code)), notes: '', added: true
     };
     this.persistAdded(book);
     this.setState(s => ({ books: s.books.concat([book]), addStep: 'choose', draft: null, lookupState: 'idle', tab: 'cerca', detailId: book.id, toast: '“' + book.title + '” aggiunto alla biblioteca' }));
@@ -859,12 +901,13 @@ class Component extends DCLogic {
       // add
       isChoose: st.addStep === 'choose',
       isScan: st.addStep === 'scan',
+      scanError: st.scanError || null,
       isIsbn: st.addStep === 'isbn',
       isReview: st.addStep === 'review',
-      startScan: () => this.setState({ addStep: 'scan' }),
+      startScan: () => this.setState({ addStep: 'scan', scanError: null }),
       startIsbn: () => this.setState({ addStep: 'isbn', isbnInput: '', lookupState: 'idle' }),
       startManual: () => this.setState({ addStep: 'review', lookupState: 'manual', draft: { title: '', author: '', publisher: '', year: '', isbn: '', side: 'DX', sector: '' } }),
-      backToChoose: () => this.setState({ addStep: 'choose', draft: null, lookupState: 'idle', isbnInput: '' }),
+      backToChoose: () => this.setState({ addStep: 'choose', draft: null, lookupState: 'idle', isbnInput: '', scanError: null }),
       simulateScan: () => this.doLookup('9780140328721'),
       isbnInput: st.isbnInput,
       onIsbnInput: (e) => this.setState({ isbnInput: e.target.value, lookupState: 'idle' }),
