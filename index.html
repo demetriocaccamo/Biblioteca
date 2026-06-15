@@ -459,9 +459,12 @@
       <button onClick="{{ closeBook }}" style="background:#f1e2cd;border:none;width:36px;height:36px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9c5a3c" stroke-width="2.4" stroke-linecap="round"><polyline points="15 6 9 12 15 18"></polyline></svg>
       </button>
-      <sc-if value="{{ detailDeletable }}">
-        <button onClick="{{ deleteBook }}" style="background:none;border:none;color:#b04a35;font-size:13.5px;font-weight:600;cursor:pointer;padding:8px 4px">Elimina</button>
-      </sc-if>
+      <div style="display:flex;align-items:center;gap:10px">
+        <sc-if value="{{ detailDeletable }}">
+          <button onClick="{{ deleteBook }}" style="background:none;border:none;color:#b04a35;font-size:13.5px;font-weight:600;cursor:pointer;padding:8px 4px">Elimina</button>
+        </sc-if>
+        <button onClick="{{ startEdit }}" style="background:none;border:none;color:#9c5a3c;font-size:13.5px;font-weight:600;cursor:pointer;padding:8px 4px">Modifica</button>
+      </div>
     </header>
     <div class="biblio-scroll" style="flex:1;overflow-y:auto;padding:26px 22px 40px">
       <div style="width:152px;height:218px;margin:0 auto;position:relative;border-radius:9px;overflow:hidden;background:{{ detailSpine }};box-shadow:0 16px 36px rgba(50,30,15,0.3)">
@@ -497,6 +500,37 @@
           <div style="font-size:13px;color:#d8c6a8;margin-top:1px">{{ detailLocation }}</div>
         </div>
       </div>
+
+      <!-- modifica dati libro -->
+      <sc-if value="{{ isEditOpen }}">
+        <div style="margin-top:18px;background:#fffdf8;border:1px solid #e9dcc4;border-radius:15px;padding:16px">
+          <div style="font-size:12px;font-weight:600;color:#8d7c66;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:14px">Modifica dati</div>
+          <div style="margin-bottom:11px">
+            <label style="font-size:11.5px;color:#a2917a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Titolo</label>
+            <input value="{{ editTitle }}" onInput="{{ onEditTitle }}" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2c241c;outline:none;font-family:'Spectral',serif;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:11px">
+            <label style="font-size:11.5px;color:#a2917a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Autore</label>
+            <input value="{{ editAuthor }}" onInput="{{ onEditAuthor }}" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2c241c;outline:none;font-family:'Spectral',serif;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:11px">
+            <label style="font-size:11.5px;color:#a2917a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Editore</label>
+            <input value="{{ editPublisher }}" onInput="{{ onEditPublisher }}" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2c241c;outline:none;font-family:'Spectral',serif;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:11px">
+            <label style="font-size:11.5px;color:#a2917a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Anno</label>
+            <input value="{{ editYear }}" onInput="{{ onEditYear }}" inputmode="numeric" maxlength="4" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2c241c;outline:none;font-family:'Spectral',serif;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:11.5px;color:#a2917a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">ISBN</label>
+            <input value="{{ editIsbn }}" onInput="{{ onEditIsbn }}" inputmode="numeric" style="margin-top:5px;width:100%;border:1px solid #e2d5bd;border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:#2c241c;outline:none;font-family:'Spectral',serif;box-sizing:border-box">
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onClick="{{ cancelEdit }}" style="flex:1;padding:12px;border-radius:12px;border:1px solid #e2d5bd;background:#fffdf8;color:#8d7c66;font-size:14px;font-weight:600;cursor:pointer">Annulla</button>
+            <button onClick="{{ confirmEdit }}" style="flex:2;padding:12px;border-radius:12px;border:none;background:#9c4f30;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Salva modifiche</button>
+          </div>
+        </div>
+      </sc-if>
 
       <!-- sposta libro -->
       <sc-if value="{{ !isMoveOpen }}">
@@ -548,7 +582,8 @@ class Component extends DCLogic {
     loaded: false, books: [], tab: 'cerca', query: '',
     detailId: null, browseMode: 'scaffali', sector: null,
     addStep: 'choose', isbnInput: '', lookupState: 'idle', draft: null, toast: null, scanError: null, scanLoading: false,
-    moveMode: false, moveDraft: null
+    moveMode: false, moveDraft: null,
+    editMode: false, editDraft: null
   };
 
   KEY = 'biblioteca_v1';
@@ -564,7 +599,9 @@ class Component extends DCLogic {
         const moves = store.moves || {};
         const books = base.concat(added);
         books.forEach(b => {
+          const edits = store.edits || {};
           if (moves[b.id]) Object.assign(b, moves[b.id]);
+          if (edits[b.id]) Object.assign(b, edits[b.id]);
           if (overrides[b.id] != null) b.notes = overrides[b.id];
         });
         this.setState({ books, loaded: true });
@@ -576,6 +613,7 @@ class Component extends DCLogic {
   save(s) { try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch (e) {} }
   persistOverride(id, notes) { const s = this.load(); s.overrides = s.overrides || {}; s.overrides[id] = notes; this.save(s); }
   persistMove(id, patch) { const s = this.load(); s.moves = s.moves || {}; s.moves[id] = patch; this.save(s); }
+  persistEdit(id, patch) { const s = this.load(); s.edits = s.edits || {}; s.edits[id] = Object.assign({}, s.edits[id] || {}, patch); this.save(s); }
 
   confirmMove() {
     const { detailId, moveDraft } = this.state;
@@ -1039,7 +1077,7 @@ class Component extends DCLogic {
 
       // detail
       isDetailOpen: !!db,
-      closeBook: () => this.setState({ detailId: null, moveMode: false, moveDraft: null }),
+      closeBook: () => this.setState({ detailId: null, moveMode: false, moveDraft: null, editMode: false, editDraft: null }),
       ...detailVals,
 
       // move
@@ -1067,6 +1105,29 @@ class Component extends DCLogic {
           return { label, value: c, bg: active ? '#9c4f30' : '#f4e8d6', color: active ? '#fff' : '#9c5a3c', border: active ? '#9c4f30' : '#eaddc6', onPick: () => this.setState(s => ({ moveDraft: Object.assign({}, s.moveDraft, { sector: c }) })) };
         });
       })(),
+
+      // edit book data
+      isEditOpen: !!st.editMode && !!db,
+      editTitle: st.editDraft ? st.editDraft.title : (db ? db.title || '' : ''),
+      editAuthor: st.editDraft ? st.editDraft.author : (db ? db.author || '' : ''),
+      editPublisher: st.editDraft ? st.editDraft.publisher : (db ? db.publisher || '' : ''),
+      editYear: st.editDraft ? st.editDraft.year : (db ? db.year || '' : ''),
+      editIsbn: st.editDraft ? st.editDraft.isbn : (db ? db.isbn || '' : ''),
+      startEdit: () => db ? this.setState({ editMode: true, editDraft: { title: db.title || '', author: db.author || '', publisher: db.publisher || '', year: db.year || '', isbn: db.isbn || '' } }) : null,
+      cancelEdit: () => this.setState({ editMode: false, editDraft: null }),
+      onEditTitle: (e) => this.setState(s => ({ editDraft: Object.assign({}, s.editDraft, { title: e.target.value }) })),
+      onEditAuthor: (e) => this.setState(s => ({ editDraft: Object.assign({}, s.editDraft, { author: e.target.value }) })),
+      onEditPublisher: (e) => this.setState(s => ({ editDraft: Object.assign({}, s.editDraft, { publisher: e.target.value }) })),
+      onEditYear: (e) => this.setState(s => ({ editDraft: Object.assign({}, s.editDraft, { year: e.target.value }) })),
+      onEditIsbn: (e) => this.setState(s => ({ editDraft: Object.assign({}, s.editDraft, { isbn: e.target.value }) })),
+      confirmEdit: () => {
+        const { detailId, editDraft } = this.state;
+        if (!detailId || !editDraft) return;
+        const patch = { title: editDraft.title.trim(), author: editDraft.author.trim(), publisher: editDraft.publisher.trim(), year: editDraft.year.trim(), isbn: editDraft.isbn.trim() };
+        this.persistEdit(detailId, patch);
+        this.setState(s => ({ books: s.books.map(b => b.id === detailId ? Object.assign({}, b, patch) : b), editMode: false, editDraft: null, toast: 'Dati aggiornati' }));
+        clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 2200);
+      },
 
       // add
       isChoose: st.addStep === 'choose',
