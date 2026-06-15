@@ -408,6 +408,36 @@
     </div>
     </sc-if>
 
+    <!-- ============ DATI ============ -->
+    <sc-if value="{{ isDati }}">
+    <div style="padding:24px 20px 4px">
+      <div style="font-family:'Spectral',serif;font-size:25px;font-weight:600">I miei dati</div>
+      <div style="font-size:14px;color:#8d7c66;margin-top:4px;line-height:1.5">I tuoi libri aggiunti, note e spostamenti sono salvati nel telefono. Esporta un backup per non perderli.</div>
+
+      <div style="margin-top:22px;background:#fffdf8;border:1px solid #e9dcc4;border-radius:15px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f0e5d1"><span style="color:#8d7c66;font-size:13.5px">Libri aggiunti</span><span style="font-size:14px;font-weight:600">{{ datiAddedCount }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f0e5d1"><span style="color:#8d7c66;font-size:13.5px">Note salvate</span><span style="font-size:14px;font-weight:600">{{ datiNotesCount }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f0e5d1"><span style="color:#8d7c66;font-size:13.5px">Libri spostati</span><span style="font-size:14px;font-weight:600">{{ datiMovesCount }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:13px 16px"><span style="color:#8d7c66;font-size:13.5px">Dati modificati</span><span style="font-size:14px;font-weight:600">{{ datiEditsCount }}</span></div>
+      </div>
+
+      <button onClick="{{ exportData }}" style="margin-top:18px;width:100%;background:#9c4f30;color:#fff;border:none;border-radius:13px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Esporta backup
+      </button>
+
+      <div style="margin-top:12px;background:#fffdf8;border:1px solid #e9dcc4;border-radius:13px;padding:14px">
+        <div style="font-size:13px;color:#8d7c66;margin-bottom:10px">Ripristina da un backup precedente:</div>
+        <label style="display:flex;align-items:center;justify-content:center;gap:9px;background:#f1e2cd;color:#6f4a2a;border:none;border-radius:11px;padding:12px;font-size:14px;font-weight:600;cursor:pointer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Importa backup
+          <input type="file" accept=".json" onChange="{{ importData }}" style="display:none">
+        </label>
+        <div style="font-size:11.5px;color:#c08060;margin-top:8px;line-height:1.4">⚠️ L'importazione sovrascrive i dati attuali.</div>
+      </div>
+    </div>
+    </sc-if>
+
     <!-- ============ BOTTOM NAV ============ -->
     <nav style="position:absolute;bottom:0;left:0;right:0;height:66px;background:#fdf8ee;border-top:1px solid #e6d9c1;display:flex;align-items:stretch;padding-bottom:env(safe-area-inset-bottom)">
       <button onClick="{{ navCerca }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ cercaColor }}">
@@ -421,6 +451,10 @@
       <button onClick="{{ navAggiungi }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ aggiungiColor }}">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
         <span style="font-size:11px;font-weight:600">Aggiungi</span>
+      </button>
+      <button onClick="{{ navDati }}" style="flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ datiColor }}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span style="font-size:11px;font-weight:600">Dati</span>
       </button>
     </nav>
   </div>
@@ -1030,13 +1064,60 @@ class Component extends DCLogic {
       total: books.length,
 
       // tabs
-      isCerca: tab === 'cerca', isSfoglia: tab === 'sfoglia', isAggiungi: tab === 'aggiungi',
+      isCerca: tab === 'cerca', isSfoglia: tab === 'sfoglia', isAggiungi: tab === 'aggiungi', isDati: tab === 'dati',
       navCerca: () => this.setState({ tab: 'cerca' }),
       navSfoglia: () => this.setState({ tab: 'sfoglia' }),
       navAggiungi: () => this.setState({ tab: 'aggiungi', addStep: 'choose', draft: null, lookupState: 'idle' }),
+      navDati: () => this.setState({ tab: 'dati' }),
       cercaColor: tab === 'cerca' ? '#9c4f30' : '#b3a48d',
       sfogliaColor: tab === 'sfoglia' ? '#9c4f30' : '#b3a48d',
       aggiungiColor: tab === 'aggiungi' ? '#9c4f30' : '#b3a48d',
+      datiColor: tab === 'dati' ? '#9c4f30' : '#b3a48d',
+      datiAddedCount: (() => { const s = this.load(); return ((s.added || []).length) + ' libri'; })(),
+      datiNotesCount: (() => { const s = this.load(); return Object.keys(s.overrides || {}).length + ' libri'; })(),
+      datiMovesCount: (() => { const s = this.load(); return Object.keys(s.moves || {}).length + ' libri'; })(),
+      datiEditsCount: (() => { const s = this.load(); return Object.keys(s.edits || {}).length + ' libri'; })(),
+      exportData: () => {
+        const data = this.load();
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const date = new Date().toISOString().slice(0, 10);
+        a.href = url; a.download = 'biblioteca-backup-' + date + '.json';
+        a.click(); URL.revokeObjectURL(url);
+      },
+      importData: (e) => {
+        const file = e && e.target && e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (typeof data !== 'object' || Array.isArray(data)) throw new Error('formato non valido');
+            this.save(data);
+            const store = this.load();
+            const added = store.added || [];
+            const overrides = store.overrides || {};
+            const moves = store.moves || {};
+            const edits = store.edits || {};
+            fetch('./data/books.json').then(r => r.json()).then(base => {
+              const bks = base.concat(added);
+              bks.forEach(b => {
+                if (moves[b.id]) Object.assign(b, moves[b.id]);
+                if (edits[b.id]) Object.assign(b, edits[b.id]);
+                if (overrides[b.id] != null) b.notes = overrides[b.id];
+              });
+              this.setState({ books: bks, toast: 'Backup ripristinato (' + added.length + ' libri aggiunti)' });
+              clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 3000);
+            });
+          } catch (err) {
+            this.setState({ toast: 'File non valido. Usa un backup esportato da questa app.' });
+            clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: null }), 3000);
+          }
+        };
+        reader.readAsText(file);
+      },
 
       // search
       query: st.query,
