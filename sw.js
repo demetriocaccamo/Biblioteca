@@ -21,15 +21,24 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for API calls (ISBN lookup, covers), cache-first for local assets
   const url = new URL(e.request.url);
   const isLocal = url.origin === self.location.origin;
-  if (isLocal) {
+  if (!isLocal) return;
+  // books.json sempre dalla rete, cache solo se offline
+  if (url.pathname.endsWith('/data/books.json')) {
     e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+      fetch(e.request).then(res => {
         if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
         return res;
-      }))
+      }).catch(() => caches.match(e.request))
     );
+    return;
   }
+  // tutto il resto: cache-first
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+      if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+      return res;
+    }))
+  );
 });
