@@ -724,19 +724,39 @@ class Component extends DCLogic {
     return null;
   }
 
+  async tryGoogleAlt(raw) {
+    // Google Books senza prefisso isbn: — trova edizioni che l'altro manca
+    try {
+      const r = await this.fetchWithTimeout('https://www.googleapis.com/books/v1/volumes?q=' + raw + '&maxResults=1', 8000);
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (j.items && j.items[0] && j.items[0].volumeInfo) {
+        const v = j.items[0].volumeInfo;
+        const isbns = (v.industryIdentifiers || []).map(x => x.identifier.replace(/[^0-9Xx]/g,''));
+        if (isbns.length && !isbns.includes(raw)) return null;
+        return { title: v.title || '', author: (v.authors || []).join(', '), publisher: v.publisher || '', year: this.yearOf(v.publishedDate) };
+      }
+    } catch(e) {}
+    return null;
+  }
+
   doLookup(isbnArg) {
     const raw = (isbnArg != null ? isbnArg : this.state.isbnInput).replace(/[^0-9Xx]/g, '');
     if (raw.length !== 10 && raw.length !== 13) { this.setState({ lookupState: 'error' }); return; }
     this.setState({ lookupState: 'loading' });
-    (async () => {
-      const results = await Promise.all([this.tryGoogle(raw), this.tryOpenLibrary(raw), this.tryOpenLibrarySearch(raw)]);
-      const info = results.find(r => r !== null) || null;
+    Promise.allSettled([
+      this.tryGoogle(raw),
+      this.tryGoogleAlt(raw),
+      this.tryOpenLibrary(raw),
+      this.tryOpenLibrarySearch(raw)
+    ]).then(results => {
+      const info = results.map(r => r.status === 'fulfilled' ? r.value : null).find(v => v != null) || null;
       if (info) {
         this.setState({ draft: { title: info.title, author: info.author, publisher: info.publisher, year: info.year, isbn: raw, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'found', isbnInput: '' });
       } else {
         this.setState({ draft: { title: '', author: '', publisher: '', year: '', isbn: raw, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'missed', isbnInput: '' });
       }
-    })();
+    });
   }
 
   saveBook() {
