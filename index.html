@@ -614,7 +614,7 @@ class Component extends DCLogic {
 
   async tryGoogle(raw) {
     try {
-      const r = await this.fetchWithTimeout('https://www.googleapis.com/books/v1/volumes?q=isbn:' + raw, 5000);
+      const r = await this.fetchWithTimeout('https://www.googleapis.com/books/v1/volumes?q=isbn:' + raw, 8000);
       if (!r.ok) return null;
       const j = await r.json();
       if (j.totalItems > 0 && j.items && j.items[0].volumeInfo) {
@@ -627,7 +627,7 @@ class Component extends DCLogic {
 
   async tryOpenLibrary(raw) {
     try {
-      const r = await this.fetchWithTimeout('https://openlibrary.org/api/books?bibkeys=ISBN:' + raw + '&format=json&jscmd=data', 5000);
+      const r = await this.fetchWithTimeout('https://openlibrary.org/api/books?bibkeys=ISBN:' + raw + '&format=json&jscmd=data', 8000);
       if (!r.ok) return null;
       const j = await r.json();
       const d = j['ISBN:' + raw];
@@ -643,6 +643,24 @@ class Component extends DCLogic {
     return null;
   }
 
+  async tryOpenLibrarySearch(raw) {
+    try {
+      const r = await this.fetchWithTimeout('https://openlibrary.org/search.json?isbn=' + raw + '&limit=1', 8000);
+      if (!r.ok) return null;
+      const j = await r.json();
+      const d = j.docs && j.docs[0];
+      if (d && d.title) {
+        return {
+          title: d.title || '',
+          author: (d.author_name || []).join(', '),
+          publisher: (d.publisher && d.publisher[0]) || '',
+          year: this.yearOf(d.first_publish_year || (d.publish_year && d.publish_year[0]))
+        };
+      }
+    } catch (e) {}
+    return null;
+  }
+
   doLookup(isbnArg) {
     const raw = (isbnArg != null ? isbnArg : this.state.isbnInput).replace(/[^0-9Xx]/g, '');
     if (raw.length !== 10 && raw.length !== 13) { this.setState({ lookupState: 'error' }); return; }
@@ -650,6 +668,7 @@ class Component extends DCLogic {
     (async () => {
       let info = await this.tryGoogle(raw);
       if (!info) info = await this.tryOpenLibrary(raw);
+      if (!info) info = await this.tryOpenLibrarySearch(raw);
       if (info) {
         this.setState({ draft: { title: info.title, author: info.author, publisher: info.publisher, year: info.year, isbn: raw, side: 'DX', sector: '' }, addStep: 'review', lookupState: 'found', isbnInput: '' });
       } else {
