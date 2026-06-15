@@ -1,4 +1,4 @@
-const CACHE = 'biblioteca-v4';
+const CACHE = 'biblioteca-v5';
 const PRECACHE = [
   './',
   './index.html',
