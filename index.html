@@ -532,9 +532,9 @@ class Component extends DCLogic {
   }
 
   PALETTE = ['#9c4f30', '#b07d3f', '#8a5a3a', '#5f7150', '#4f6b6b', '#5c6b8a', '#8a5a6b', '#6b5a8a', '#a35545'];
-  THEME_COLORS = { Narrativa: '#9c4f30', Storia: '#8a5a3a', Mare: '#4f6b8a', Scienze: '#5f7150', Poesia: '#8a5a6b', Biografie: '#b07d3f', Saggi: '#6b5a8a', Mafia: '#7a3a30', Arte: '#5c6b8a', Lodi: '#5f7150', Ragazzi: '#cf9444', Sociologia: '#6b5a8a', Varie: '#7a6b5a' };
+  THEME_COLORS = { Narrativa: '#9c4f30', Storia: '#8a5a3a', Mare: '#4f6b8a', Scienze: '#5f7150', Poesia: '#8a5a6b', Biografie: '#b07d3f', Saggi: '#6b5a8a', Mafia: '#7a3a30', Arte: '#5c6b8a', Lodi: '#5f7150', Ragazzi: '#cf9444', Sociologia: '#6b5a8a', Varie: '#7a6b5a', 'Prime edizioni': '#6b3a7a' };
   SX_CELL_CAT = { E1: 'Mare', E2: 'Storia', E3: 'Storia', E4: 'Storia', E5: 'Mare', E6: 'Scienze', E7: 'Poesia', F1: 'Lodi', F2: '', F3: '', F4: '', F5: '', F6: '', F7: '', G1: 'Lodi', G2: 'Saggi', G3: 'Mafia', G4: 'Biografie', G5: 'Biografie', G6: 'Biografie', G7: 'Arte' };
-  CAT_ORDER = ['Narrativa', 'Storia', 'Mare', 'Scienze', 'Poesia', 'Biografie', 'Saggi', 'Mafia', 'Arte', 'Lodi', 'Ragazzi'];
+  CAT_ORDER = ['Narrativa', 'Prime edizioni', 'Storia', 'Mare', 'Scienze', 'Poesia', 'Biografie', 'Saggi', 'Mafia', 'Arte', 'Lodi', 'Ragazzi'];
 
   spine(seed) { let h = 0; const s = seed || ''; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return this.PALETTE[h % this.PALETTE.length]; }
   initial(b) { const s = b.lastName || b.title || '?'; return (s[0] || '?').toUpperCase(); }
