@@ -740,6 +740,57 @@ class Component extends DCLogic {
     return null;
   }
 
+  async trySBN(raw) {
+    // Catalogo SBN - Servizio Bibliotecario Nazionale italiano
+    try {
+      const url = 'https://opac.sbn.it/sru/SBN?operation=searchRetrieve&version=1.1&query=bath.isbn%3D%22' + raw + '%22&maximumRecords=1&recordSchema=dc';
+      const r = await this.fetchWithTimeout(url, 8000);
+      if (!r.ok) return null;
+      const xml = await r.text();
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const get = tag => { const el = doc.querySelector(tag); return el ? el.textContent.trim() : ''; };
+      const title = get('title') || get('dc\\:title');
+      if (!title) return null;
+      const creator = get('creator') || get('dc\\:creator');
+      const publisher = get('publisher') || get('dc\\:publisher');
+      const date = get('date') || get('dc\\:date');
+      return { title, author: creator, publisher, year: this.yearOf(date) };
+    } catch(e) {}
+    return null;
+  }
+
+  async tryWorldCat(raw) {
+    // WorldCat Classify — catalogo mondiale biblioteche
+    try {
+      const url = 'https://classify.oclc.org/classify2/Classify?isbn=' + raw + '&summary=true';
+      const r = await this.fetchWithTimeout(url, 8000);
+      if (!r.ok) return null;
+      const xml = await r.text();
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const work = doc.querySelector('work');
+      if (!work) return null;
+      const title = work.getAttribute('title') || '';
+      const author = work.getAttribute('author') || '';
+      if (!title) return null;
+      return { title, author, publisher: '', year: '' };
+    } catch(e) {}
+    return null;
+  }
+
+  async tryISBNitalia(raw) {
+    // ISBN.it — archivio ISBN italiano
+    try {
+      const url = 'https://www.isbn.it/isbn/' + raw + '.json';
+      const r = await this.fetchWithTimeout(url, 8000);
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!j || !j.title) return null;
+      const author = [j.author_first, j.author_last].filter(Boolean).join(' ') || (j.authors && j.authors[0]) || '';
+      return { title: j.title, author, publisher: j.publisher || '', year: this.yearOf(j.year) };
+    } catch(e) {}
+    return null;
+  }
+
   doLookup(isbnArg) {
     const raw = (isbnArg != null ? isbnArg : this.state.isbnInput).replace(/[^0-9Xx]/g, '');
     if (raw.length !== 10 && raw.length !== 13) { this.setState({ lookupState: 'error' }); return; }
@@ -748,7 +799,10 @@ class Component extends DCLogic {
       this.tryGoogle(raw),
       this.tryGoogleAlt(raw),
       this.tryOpenLibrary(raw),
-      this.tryOpenLibrarySearch(raw)
+      this.tryOpenLibrarySearch(raw),
+      this.trySBN(raw),
+      this.tryWorldCat(raw),
+      this.tryISBNitalia(raw)
     ]).then(results => {
       const info = results.map(r => r.status === 'fulfilled' ? r.value : null).find(v => v != null) || null;
       if (info) {
