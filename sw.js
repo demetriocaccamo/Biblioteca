@@ -1,4 +1,4 @@
-const CACHE = 'biblioteca-v7';
+const CACHE = 'biblioteca-v8';
 const PRECACHE = [
   './',
   './index.html',
@@ -20,25 +20,14 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first per tutto: sempre aggiornato, cache solo se offline
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  const isLocal = url.origin === self.location.origin;
-  if (!isLocal) return;
-  // books.json sempre dalla rete, cache solo se offline
-  if (url.pathname.endsWith('/data/books.json')) {
-    e.respondWith(
-      fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-        return res;
-      }).catch(() => caches.match(e.request))
-    );
-    return;
-  }
-  // tutto il resto: cache-first
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+    fetch(e.request).then(res => {
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
       return res;
-    }))
+    }).catch(() => caches.match(e.request))
   );
 });
